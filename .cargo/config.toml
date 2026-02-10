@@ -1,0 +1,2 @@
+[env]
+GDAL_VERSION = "3.11.3"
