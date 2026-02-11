@@ -18,26 +18,26 @@ impl DataCatalog {
         })
     }
 
-    pub fn check_coverage(&self, rect: Rect<f64>) -> ValidationReport {
+    pub fn check_coverage(&self, rect: Rect<f64>) -> CoverageResult {
         let target = Polygon::from(rect);
 
-        let ratios = [
-            ("ALOS Palsar", self.calc_ratio(&self.alos_polys(), &target)),
-            ("ESA WorldCover", self.calc_ratio(&self.esa_polys(), &target)),
-            ("SoilGrid", self.calc_ratio(&self.soil_polys(), &target)),
-        ];
+        let alos_coverage = self.calc_ratio(&self.alos_polys(), &target);
+        let esa_coverage = self.calc_ratio(&self.esa_polys(), &target);
+        let soil_coverage = self.calc_ratio(&self.soil_polys(), &target);
 
-        let details = ratios
+        const FULL_COV_THRESHOLD: f64 = 0.999;
+        let is_full = [alos_coverage, esa_coverage, soil_coverage]
             .iter()
-            .filter(|(_, ratio)| *ratio < 0.999)
-            .map(|(name, ratio)| {
-                format!("{} incomplete, now coverage: {:.2}%", name, ratio * 100.0)
-            })
-            .collect::<Vec<_>>();
+            .all(|r| *r > FULL_COV_THRESHOLD);
 
-        ValidationReport {
-            is_ready: details.is_empty(),
-            details,
+        if is_full {
+            CoverageResult::Full
+        } else {
+            CoverageResult::Partial {
+                alos_coverage,
+                esa_coverage,
+                soil_coverage,
+            }
         }
     }
 

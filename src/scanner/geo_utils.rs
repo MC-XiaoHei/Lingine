@@ -1,3 +1,4 @@
+use crate::utils::dataset::DatasetEx;
 use anyhow::{Context, Result, anyhow};
 use gdal::Dataset;
 use gdal::spatial_ref::{AxisMappingStrategy, CoordTransform, SpatialRef};
@@ -11,8 +12,7 @@ pub async fn extract_bounds_async(path: &Path) -> Result<Rect<f64>> {
 }
 
 fn extract_bounds(path: &Path) -> Result<Rect<f64>> {
-    let dataset =
-        Dataset::open(path).with_context(|| format!("Failed to open GeoTIFF: {path:?}"))?;
+    let dataset = Dataset::open_dataset(path)?;
 
     let transform = create_projection_transform(&dataset)?;
     let pixel_corners = get_pixel_corners(&dataset);
@@ -59,7 +59,6 @@ fn get_pixel_corners(dataset: &Dataset) -> PointSet {
     }
 }
 
-// X_geo = GT[0] + X_pix * GT[1] + Y_pix * GT[2]
 fn apply_geo_transform(pixels: &PointSet, dataset: &Dataset) -> Result<PointSet> {
     let gt = dataset.geo_transform().context("GeoTransform missing")?;
 
@@ -70,6 +69,7 @@ fn apply_geo_transform(pixels: &PointSet, dataset: &Dataset) -> Result<PointSet>
         let px = pixels.x[i];
         let py = pixels.y[i];
 
+        // X_geo = GT[0] + X_pix * GT[1] + Y_pix * GT[2]
         let x = gt[0] + px * gt[1] + py * gt[2];
         let y = gt[3] + px * gt[4] + py * gt[5];
 

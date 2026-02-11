@@ -43,6 +43,16 @@ pub struct SoilTile {
 }
 
 #[derive(Debug)]
+pub enum CoverageResult {
+    Full,
+    Partial {
+        alos_coverage: f64,
+        esa_coverage: f64,
+        soil_coverage: f64,
+    },
+}
+
+#[derive(Debug)]
 pub struct ValidationReport {
     pub is_ready: bool,
     pub details: Vec<String>,
