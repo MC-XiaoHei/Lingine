@@ -1,12 +1,12 @@
-mod bundle;
+pub mod bundle;
 pub mod mosaic;
 mod reader;
 
-use crate::scanner::DataCatalog;
 use anyhow::Result;
-pub use bundle::LayerBundle;
+use crate::loader::bundle::LayerBundle;
+use crate::scanner::types::DataCatalog;
 
-pub fn load_assets(catalog: &DataCatalog) -> Result<LayerBundle> {
+pub fn load_layers(catalog: &DataCatalog) -> Result<LayerBundle> {
     let layers = LayerBundle::from_catalog(catalog);
     Ok(layers)
 }

@@ -1,4 +1,3 @@
-/* src/physics/mod.rs */
 pub mod climate;
 pub mod geometry;
 pub mod hydro;
@@ -17,9 +16,7 @@ pub struct PhysicsMap {
     pub hli: Vec<f32>,
 }
 
-pub fn analyze(grid: &TerrainGrid) -> Result<PhysicsMap> {
-    println!("Starting Physics Analysis Pipeline...");
-
+pub fn physics_analyze(grid: &TerrainGrid) -> Result<PhysicsMap> {
     let multi_bar = MultiProgress::new();
     let total_pixels = (grid.width * grid.height) as u64;
 
@@ -30,7 +27,7 @@ pub fn analyze(grid: &TerrainGrid) -> Result<PhysicsMap> {
 
     let bar_hydro = multi_bar.add(create_progress_bar(
         total_pixels * 2,
-        "Hydrology Simulation (Flow/TWI)",
+        "Hydrology Simulation (Flow/Topology/TWI)",
     ));
 
     let bar_clim = multi_bar.add(create_progress_bar(total_pixels, "Climate Modeling (HLI)"));

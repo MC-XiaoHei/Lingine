@@ -1,14 +1,20 @@
 mod alignment;
 mod core;
-mod denoise;
 mod loader;
 mod physics;
+mod restoration;
 mod scanner;
 mod utils;
 
+use crate::core::validator::{validate_data_catalog, validate_terrain_grid};
 use crate::scanner::scan_datasets;
-use anyhow::{Result, anyhow};
+use crate::utils::tap::TryTap;
+use alignment::align_and_resample;
+use anyhow::Result;
 use geo::{Coord, Rect};
+use loader::load_layers;
+use physics::physics_analyze;
+use restoration::terrain_restoration;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,35 +36,15 @@ async fn run_pipeline() -> Result<()> {
         },
     );
 
-    let data_catalog = scan_datasets().await?;
+    let terrain = scan_datasets()
+        .await?
+        .try_tap(|c| validate_data_catalog(c, roi))?
+        .try_pipe(|c| load_layers(&c))?
+        .try_pipe(|assets| align_and_resample(&assets, roi))?
+        .try_tap_mut(terrain_restoration)?
+        .try_tap(validate_terrain_grid)?;
 
-    let coverage = data_catalog.check_coverage(roi);
-    if !coverage.is_full() {
-        println!("{coverage}");
-        return Ok(());
-    }
-
-    let assets = loader::load_assets(&data_catalog)?;
-    let mut terrain = alignment::create_and_align(&assets, roi)?;
-
-    denoise::denoise(&mut terrain)?;
-
-    let valid_count = terrain.elevation.iter().flatten().count();
-    let total_count = terrain.elevation.len();
-
-    if valid_count == 0 {
-        return Err(anyhow!(
-            "Critical Error: Terrain is empty! Reader failed to load data."
-        ));
-    }
-
-    let fill_rate = valid_count as f64 / total_count as f64 * 100.0;
-    println!(
-        "DEBUG: Terrain Elevation Fill Rate: {:.2}% ({}/{})",
-        fill_rate, valid_count, total_count
-    );
-
-    let physics_map = physics::analyze(&terrain)?;
+    let physics_map = physics_analyze(&terrain)?;
 
     let avg_slope: f32 = physics_map.slope.iter().sum::<f32>()
         / physics_map.slope.len() as f32

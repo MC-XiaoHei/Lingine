@@ -1,10 +1,10 @@
 use super::geo_utils::extract_bounds_async;
-use crate::scanner::SoilTile;
 use crate::scanner::path_utils::normalize_path;
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use crate::scanner::types::SoilTile;
 
 pub async fn scan(root: PathBuf) -> Result<Vec<SoilTile>> {
     let p_sand_top = root.join("sand/0-5");

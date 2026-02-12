@@ -1,5 +1,6 @@
 use crate::core::terrain::TerrainPixel;
-use crate::loader::{LayerBundle, mosaic::MosaicSession};
+use crate::loader::bundle::LayerBundle;
+use crate::loader::mosaic::MosaicSession;
 
 pub struct SamplingSession {
     elevation: MosaicSession,

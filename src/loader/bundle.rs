@@ -1,7 +1,7 @@
 use super::mosaic::MosaicSource;
-use crate::scanner::{AlosTile, DataCatalog, EsaTile, SoilTile};
 use geo::Rect;
 use std::path::PathBuf;
+use crate::scanner::types::{AlosTile, DataCatalog, EsaTile, SoilTile};
 
 pub struct LayerBundle {
     pub elevation: MosaicSource,

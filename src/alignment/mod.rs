@@ -3,14 +3,14 @@ pub mod projection;
 mod sampler;
 
 use crate::core::terrain::TerrainGrid;
-use crate::loader::LayerBundle;
 use crate::utils::progress::create_progress_bar;
 use anyhow::Result;
 use context::SpatialContext;
 use geo::Rect;
 use rayon::prelude::*;
+use crate::loader::bundle::LayerBundle;
 
-pub fn create_and_align(assets: &LayerBundle, roi: Rect<f64>) -> Result<TerrainGrid> {
+pub fn align_and_resample(assets: &LayerBundle, roi: Rect<f64>) -> Result<TerrainGrid> {
     let ctx = SpatialContext::analyze(roi);
     print_summary(&ctx);
 
