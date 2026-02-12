@@ -7,60 +7,68 @@ use anyhow::Result;
 use fill::{fill_voids_continuous, fill_voids_discrete};
 use median::apply_median;
 
+const UNIT_LEN: usize = 256;
+
 pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     let h = grid.height;
     let w = grid.width;
+    const ITERS_SMOOTH: u64 = 5;
 
-    const COUNT_CONTINUOUS: u64 = 12;
-    const COUNT_DISCRETE: u64 = 1;
-    const COUNT_MEDIAN: u64 = 4;
+    let count_continuous = get_continuous_layers(grid).len() as u64;
+    let count_discrete = get_discrete_layers(grid).len() as u64;
+    let count_median = get_median_layers(grid).len() as u64;
 
-    const PYRAMID_WORK_FACTOR: u64 = 14;
-    const MEDIAN_WORK_FACTOR: u64 = 1;
+    let ticks_per_fill = calc_fill_ticks(w, h, ITERS_SMOOTH);
+    let total_rows = (count_continuous + count_discrete) * ticks_per_fill + (count_median * h as u64);
 
-    let total_rows = (COUNT_CONTINUOUS + COUNT_DISCRETE) * (h as u64 * PYRAMID_WORK_FACTOR)
-        + COUNT_MEDIAN * (h as u64 * MEDIAN_WORK_FACTOR);
+    let bar = create_progress_bar(total_rows, "Terrain Restoration");
 
-    let bar = create_progress_bar(total_rows, "Terrain Restoring");
+    get_continuous_layers(grid).into_iter().for_each(|layer| {
+        fill_voids_continuous(layer, w, h, ITERS_SMOOTH, &bar);
+    });
 
-    {
-        let mut continuous_layers = vec![
-            &mut grid.elevation,
-            &mut grid.hh,
-            &mut grid.hv,
-            &mut grid.inc,
-            &mut grid.ls,
-            &mut grid.sand,
-            &mut grid.clay,
-            &mut grid.soc,
-            &mut grid.ph,
-            &mut grid.sand_sub,
-            &mut grid.clay_sub,
-            &mut grid.ph_sub,
-        ];
+    get_discrete_layers(grid).into_iter().for_each(|layer| {
+        fill_voids_discrete(layer, w, h, ITERS_SMOOTH, &bar);
+    });
 
-        let mut discrete_layers = vec![&mut grid.landcover];
-
-        continuous_layers.iter_mut().for_each(|layer| {
-            fill_voids_continuous(layer, w, h, 5, &bar);
-        });
-        discrete_layers.iter_mut().for_each(|layer| {
-            fill_voids_discrete(layer, w, h, 5, &bar);
-        });
-    }
-
-    {
-        let mut median_layers = vec![&mut grid.sand, &mut grid.clay, &mut grid.soc, &mut grid.ph];
-
-        let process_median = |layer: &mut Vec<Option<f32>>| {
-            apply_median(layer, w, h, &bar);
-        };
-
-        median_layers
-            .iter_mut()
-            .for_each(|layer| process_median(layer));
-    }
+    get_median_layers(grid).into_iter().for_each(|layer| {
+        apply_median(layer, w, h, &bar);
+    });
 
     bar.finish();
     Ok(())
+}
+
+fn get_continuous_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<f32>>> {
+    vec![
+        &mut g.elevation, &mut g.hh, &mut g.hv, &mut g.inc, &mut g.ls,
+        &mut g.sand, &mut g.clay, &mut g.soc, &mut g.ph,
+        &mut g.sand_sub, &mut g.clay_sub, &mut g.ph_sub,
+    ]
+}
+
+fn get_discrete_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<u8>>> {
+    vec![&mut g.landcover]
+}
+
+fn get_median_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<f32>>> {
+    vec![&mut g.sand, &mut g.clay, &mut g.soc, &mut g.ph]
+}
+
+fn calc_fill_ticks(w: usize, h: usize, iters: u64) -> u64 {
+    if w < UNIT_LEN || h < UNIT_LEN {
+        return (h as u64) * (UNIT_LEN as u64);
+    }
+
+    let next_w = (w + 1) / 2;
+    let next_h = (h + 1) / 2;
+
+    let mut ticks = 0;
+
+    ticks += next_h as u64;
+    ticks += calc_fill_ticks(next_w, next_h, iters);
+    ticks += h as u64;
+    ticks += (h as u64) * iters;
+
+    ticks
 }

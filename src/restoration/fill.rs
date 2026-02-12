@@ -2,8 +2,7 @@ use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-const UNIT_LEN: usize = 256;
+use crate::restoration::UNIT_LEN;
 
 pub fn fill_voids_continuous(
     data: &mut Vec<Option<f32>>,

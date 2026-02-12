@@ -21,34 +21,24 @@ pub fn apply_median(data: &mut Vec<Option<f32>>, width: usize, height: usize, ba
                     continue;
                 }
 
-                let v_c  = source[curr_row + x];
-                let v_u  = source[prev_row + x];
-                let v_d  = source[next_row + x];
-                let v_l  = source[curr_row + x - 1];
-                let v_r  = source[curr_row + x + 1];
-                let v_ul = source[prev_row + x - 1];
-                let v_ur = source[prev_row + x + 1];
-                let v_dl = source[next_row + x - 1];
-                let v_dr = source[next_row + x + 1];
+                let mut neighbors = Vec::with_capacity(9);
 
-                let mut sum = 0.0;
-                let mut total_weight = 0.0;
+                if let Some(v) = source[prev_row + x - 1] { neighbors.push(v); }
+                if let Some(v) = source[prev_row + x]     { neighbors.push(v); }
+                if let Some(v) = source[prev_row + x + 1] { neighbors.push(v); }
 
-                macro_rules! acc {
-                    ($val:expr, $w:expr) => {
-                        if let Some(v) = $val {
-                            sum += v * $w;
-                            total_weight += $w;
-                        }
-                    };
-                }
+                if let Some(v) = source[curr_row + x - 1] { neighbors.push(v); }
+                if let Some(v) = source[curr_row + x]     { neighbors.push(v); }
+                if let Some(v) = source[curr_row + x + 1] { neighbors.push(v); }
 
-                acc!(v_c,  4.0);
-                acc!(v_u,  2.0); acc!(v_d,  2.0); acc!(v_l,  2.0); acc!(v_r,  2.0);
-                acc!(v_ul, 1.0); acc!(v_ur, 1.0); acc!(v_dl, 1.0); acc!(v_dr, 1.0);
+                if let Some(v) = source[next_row + x - 1] { neighbors.push(v); }
+                if let Some(v) = source[next_row + x]     { neighbors.push(v); }
+                if let Some(v) = source[next_row + x + 1] { neighbors.push(v); }
 
-                if total_weight > 0.0 {
-                    row_slice[x] = Some(sum / total_weight);
+                if !neighbors.is_empty() {
+                    let mid = neighbors.len() / 2;
+                    neighbors.select_nth_unstable_by(mid, |a, b| a.total_cmp(b));
+                    row_slice[x] = Some(neighbors[mid]);
                 }
             }
 
