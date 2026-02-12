@@ -1,12 +1,7 @@
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 
-pub fn apply_median(
-    data: &mut Vec<Option<f32>>,
-    width: usize,
-    height: usize,
-    bar: &ProgressBar
-) {
+pub fn apply_median(data: &mut Vec<Option<f32>>, width: usize, height: usize, bar: &ProgressBar) {
     let source = data.clone();
 
     data.par_chunks_mut(width)

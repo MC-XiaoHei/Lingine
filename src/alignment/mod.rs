@@ -14,8 +14,8 @@ pub fn create_and_align(assets: &LayerBundle, roi: Rect<f64>) -> Result<TerrainG
     let ctx = SpatialContext::analyze(roi);
     print_summary(&ctx);
 
-    let mut grid = TerrainGrid::new(ctx.width, ctx.height);
-    let bar = create_progress_bar(ctx.total_pixels, "Alignment & Resampling Layers");
+    let mut grid = TerrainGrid::new(ctx.width, ctx.height, roi.center());
+    let bar = create_progress_bar(ctx.total_pixels, "Layers Alignment & Resample");
 
     grid.par_rows_mut().enumerate().for_each_init(
         || sampler::SamplingSession::new(assets),
@@ -29,7 +29,7 @@ pub fn create_and_align(assets: &LayerBundle, roi: Rect<f64>) -> Result<TerrainG
         },
     );
 
-    bar.finish_with_message("Layers Alignment & Resampling Complete");
+    bar.finish();
     Ok(grid)
 }
 

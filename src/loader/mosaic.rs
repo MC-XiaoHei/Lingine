@@ -1,4 +1,5 @@
 use super::reader::{ReaderSession, ReaderSource};
+use crate::core::raster::{Bicubic, Bilinear, Interpolator, NearestNeighbor};
 use anyhow::Result;
 use geo::{Contains, Coord, Rect};
 use std::path::PathBuf;
@@ -52,21 +53,23 @@ pub struct MosaicSession {
 
 impl MosaicSession {
     pub fn fetch_nearest(&mut self, lon: f64, lat: f64) -> Result<Option<f32>> {
-        self.fetch_impl(lon, lat, |reader, x, y| reader.probe_nearest(x, y))
+        self.fetch_impl(lon, lat, &NearestNeighbor)
     }
 
     pub fn fetch_bilinear(&mut self, lon: f64, lat: f64) -> Result<Option<f32>> {
-        self.fetch_impl(lon, lat, |reader, x, y| reader.probe_bilinear(x, y))
+        self.fetch_impl(lon, lat, &Bilinear)
     }
 
     pub fn fetch_bicubic(&mut self, lon: f64, lat: f64) -> Result<Option<f32>> {
-        self.fetch_impl(lon, lat, |reader, x, y| reader.probe_bicubic(x, y))
+        self.fetch_impl(lon, lat, &Bicubic)
     }
 
-    fn fetch_impl<F>(&mut self, lon: f64, lat: f64, op: F) -> Result<Option<f32>>
-    where
-        F: Fn(&mut ReaderSession, f64, f64) -> Option<f32>,
-    {
+    fn fetch_impl<T: Interpolator>(
+        &mut self,
+        lon: f64,
+        lat: f64,
+        strategy: &T,
+    ) -> Result<Option<f32>> {
         let coord = Coord { x: lon, y: lat };
 
         let target = self
@@ -84,7 +87,7 @@ impl MosaicSession {
             }
 
             if let Some(reader) = &mut self.active_session {
-                return Ok(op(reader, lon, lat));
+                return Ok(reader.sample(lon, lat, strategy));
             }
         }
         Ok(None)

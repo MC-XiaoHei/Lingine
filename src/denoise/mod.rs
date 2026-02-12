@@ -7,13 +7,13 @@ use median::apply_median;
 
 pub fn denoise(grid: &mut TerrainGrid) -> Result<()> {
     let h = grid.height;
-    let bar = create_progress_bar((h * 4) as u64, "Denoising Layers");
+    let bar = create_progress_bar((h * 4) as u64, "Layers Denoise");
 
     apply_median(&mut grid.sand, grid.width, grid.height, &bar);
     apply_median(&mut grid.clay, grid.width, grid.height, &bar);
     apply_median(&mut grid.soc, grid.width, grid.height, &bar);
     apply_median(&mut grid.ph, grid.width, grid.height, &bar);
 
-    bar.finish_with_message("Layers Denoise Complete");
+    bar.finish();
     Ok(())
 }

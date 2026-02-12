@@ -1,66 +1,82 @@
+use crate::core::raster::{Interpolator, PixelSource};
+use crate::core::spatial::GeoTransform;
 use crate::utils::dataset::DatasetEx;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use gdal::{Dataset, Metadata};
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct ReaderSource {
     path: PathBuf,
-    inv_transform: [f64; 6],
+    pub transform: GeoTransform,
     needs_half_pixel_shift: bool,
     no_data_value: Option<f64>,
+    preloaded_data: Option<Arc<Vec<f32>>>,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl ReaderSource {
     pub fn new(path: PathBuf) -> Result<Self> {
         let dataset = Dataset::open_dataset(&path)?;
 
-        let gt = dataset
+        let gt_array = dataset
             .geo_transform()
             .context(format!("GeoTransform missing for {path:?}"))?;
-        let det = gt[1] * gt[5] - gt[2] * gt[4];
-        if det.abs() < 1e-10 {
-            return Err(anyhow!("Invalid GeoTransform for {path:?}"));
-        }
 
-        let inv_transform = [
-            0.0,
-            gt[5] / det,
-            -gt[2] / det,
-            0.0,
-            -gt[4] / det,
-            gt[1] / det,
-        ];
+        let transform = GeoTransform::from_gdal(gt_array)?;
 
         let needs_half_pixel_shift = dataset
             .metadata_item("AREA_OR_POINT", "")
             .map(|s| s == "Area")
             .unwrap_or(false);
 
-        let no_data_value = dataset.rasterband(1)?.no_data_value();
+        let band = dataset.rasterband(1)?;
+        let no_data_value = band.no_data_value();
+        let (w, h) = band.size();
+
+        let mem_size = w * h * 4;
+        const PRELOAD_THRESHOLD: usize = 4 * 1024 * 1024 * 1024;
+
+        let preloaded_data = if mem_size < PRELOAD_THRESHOLD {
+            match band.read_as::<f32>((0, 0), (w, h), (w, h), None) {
+                Ok(buffer) => Some(Arc::new(buffer.data().to_vec())),
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
 
         Ok(Self {
             path,
-            inv_transform,
+            transform,
             needs_half_pixel_shift,
             no_data_value,
+            preloaded_data,
+            width: w,
+            height: h,
         })
     }
 
     pub fn open_session(&self) -> Result<ReaderSession> {
-        let dataset = Dataset::open_dataset(&self.path)?;
-
-        const NO_CACHE: isize = -9999;
+        let dataset = if self.preloaded_data.is_none() {
+            Some(Dataset::open_dataset(&self.path)?)
+        } else {
+            None
+        };
 
         Ok(ReaderSession {
             source: self.clone(),
             dataset,
-            cache: None,
+            cache: RefCell::new(Vec::with_capacity(8)),
         })
     }
 }
 
-const CACHE_BLOCK_SIZE: isize = 256;
+const CACHE_BLOCK_SIZE: isize = 512;
+const MAX_CACHE_ENTRIES: usize = 8;
 
 struct BlockCache {
     start_col: isize,
@@ -72,147 +88,115 @@ struct BlockCache {
 
 pub struct ReaderSession {
     source: ReaderSource,
-    dataset: Dataset,
-    cache: Option<BlockCache>,
+    dataset: Option<Dataset>,
+    cache: RefCell<Vec<BlockCache>>,
 }
 
 impl ReaderSession {
-    fn get_pixel_coord(&self, lon: f64, lat: f64) -> (f64, f64) {
-        let inv = self.source.inv_transform;
-        let gt = self.dataset.geo_transform().unwrap_or([0.0; 6]);
-
-        let dx = lon - gt[0];
-        let dy = lat - gt[3];
-        let mut u = dx * inv[1] + dy * inv[2];
-        let mut v = dx * inv[4] + dy * inv[5];
+    pub fn sample<T: Interpolator>(&self, lon: f64, lat: f64, strategy: &T) -> Option<f32> {
+        let mut px = self.source.transform.geo_to_pixel(lon, lat);
 
         if self.source.needs_half_pixel_shift {
-            u -= 0.5;
-            v -= 0.5;
-        }
-        (u, v)
-    }
-
-    pub fn probe_nearest(&mut self, lon: f64, lat: f64) -> Option<f32> {
-        let (u, v) = self.get_pixel_coord(lon, lat);
-        let col = u.round() as isize;
-        let row = v.round() as isize;
-        self.read_safe(col, row)
-    }
-
-    pub fn probe_bilinear(&mut self, lon: f64, lat: f64) -> Option<f32> {
-        let (u, v) = self.get_pixel_coord(lon, lat);
-        let x = u.floor();
-        let y = v.floor();
-        let u_ratio = (u - x) as f32;
-        let v_ratio = (v - y) as f32;
-        let u_opposite = 1.0 - u_ratio;
-        let v_opposite = 1.0 - v_ratio;
-
-        let col = x as isize;
-        let row = y as isize;
-
-        let v00 = self.read_safe(col, row)?;
-        let v10 = self.read_safe(col + 1, row)?;
-        let v01 = self.read_safe(col, row + 1)?;
-        let v11 = self.read_safe(col + 1, row + 1)?;
-
-        let result = (v00 * u_opposite + v10 * u_ratio) * v_opposite +
-            (v01 * u_opposite + v11 * u_ratio) * v_ratio;
-
-        Some(result)
-    }
-
-    pub fn probe_bicubic(&mut self, lon: f64, lat: f64) -> Option<f32> {
-        let (u, v) = self.get_pixel_coord(lon, lat);
-        let x = u.floor();
-        let y = v.floor();
-        let dx = (u - x) as f32;
-        let dy = (v - y) as f32;
-
-        let col = x as isize;
-        let row = y as isize;
-
-        let mut pixels = [[0.0; 4]; 4];
-
-        for j in 0..4 {
-            for i in 0..4 {
-                if let Some(val) = self.read_safe(col - 1 + i, row - 1 + j) {
-                    pixels[j as usize][i as usize] = val;
-                } else {
-                    return self.probe_bilinear(lon, lat);
-                }
-            }
+            px.x -= 0.5;
+            px.y -= 0.5;
         }
 
-        let eval_cubic = |p: [f32; 4], t: f32| -> f32 {
-            p[1] + 0.5 * t * (p[2] - p[0] + t * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] + t * (3.0 * (p[1] - p[2]) + p[3] - p[0])))
-        };
-
-        let mut arr = [0.0; 4];
-        for j in 0..4 {
-            arr[j] = eval_cubic(pixels[j], dx);
-        }
-
-        Some(eval_cubic(arr, dy))
+        strategy.sample(self, px.x, px.y)
     }
 
-    fn read_safe(&mut self, col: isize, row: isize) -> Option<f32> {
-        let (w, h) = self.dataset.rasterband(1).ok()?.size();
-        let w = w as isize;
-        let h = h as isize;
+    fn read_from_disk(&self, col: isize, row: isize, w: isize, h: isize) -> Option<f32> {
+        if let Some(index) = self.find_cache_index(col, row) {
+            self.promote_cache_entry(index);
+            return self.read_from_cache_head(col, row);
+        }
 
-        if col < 0 || row < 0 || col >= w || row >= h {
+        if self.load_block_to_head(col, row, w, h).is_some() {
+            return self.read_from_cache_head(col, row);
+        }
+
+        None
+    }
+
+    fn find_cache_index(&self, col: isize, row: isize) -> Option<usize> {
+        self.cache.borrow().iter().position(|c| {
+            col >= c.start_col
+                && col < c.start_col + c.width as isize
+                && row >= c.start_row
+                && row < c.start_row + c.height as isize
+        })
+    }
+
+    fn promote_cache_entry(&self, index: usize) {
+        if index == 0 {
+            return;
+        }
+        let mut cache = self.cache.borrow_mut();
+        let block = cache.remove(index);
+        cache.insert(0, block);
+    }
+
+    fn read_from_cache_head(&self, col: isize, row: isize) -> Option<f32> {
+        let cache = self.cache.borrow();
+        if cache.is_empty() {
             return None;
         }
 
-        if let Some(cache) = &self.cache {
-            if col >= cache.start_col
-                && col < cache.start_col + cache.width as isize
-                && row >= cache.start_row
-                && row < cache.start_row + cache.height as isize
-            {
-                let local_col = (col - cache.start_col) as usize;
-                let local_row = (row - cache.start_row) as usize;
-                let idx = local_row * cache.width + local_col;
-                return self.apply_nodata_check(cache.data[idx]);
-            }
-        }
+        let block = &cache[0];
+        let local_col = (col - block.start_col) as usize;
+        let local_row = (row - block.start_row) as usize;
+        let idx = local_row * block.width + local_col;
 
-        self.load_cache_block(col, row, w, h)?;
-        self.read_safe(col, row)
+        self.apply_nodata_check(block.data[idx])
     }
 
-    fn load_cache_block(&mut self, target_col: isize, target_row: isize, image_w: isize, image_h: isize) -> Option<()> {
+    fn load_block_to_head(
+        &self,
+        target_col: isize,
+        target_row: isize,
+        image_w: isize,
+        image_h: isize,
+    ) -> Option<()> {
+        let ds = self.dataset.as_ref()?;
+        let band = ds.rasterband(1).ok()?;
+
         let start_col = (target_col / CACHE_BLOCK_SIZE) * CACHE_BLOCK_SIZE;
         let start_row = (target_row / CACHE_BLOCK_SIZE) * CACHE_BLOCK_SIZE;
 
         let block_w = CACHE_BLOCK_SIZE.min(image_w - start_col) as usize;
         let block_h = CACHE_BLOCK_SIZE.min(image_h - start_row) as usize;
 
-        if block_w == 0 || block_h == 0 { return None; }
+        if block_w == 0 || block_h == 0 {
+            return None;
+        }
 
-        let band = self.dataset.rasterband(1).ok()?;
+        let buffer = band
+            .read_as::<f32>(
+                (start_col, start_row),
+                (block_w, block_h),
+                (block_w, block_h),
+                None,
+            )
+            .ok()?;
 
-        let buffer = band.read_as::<f32>(
-            (start_col, start_row),
-            (block_w, block_h),
-            (block_w, block_h),
-            None
-        ).ok()?;
-
-        self.cache = Some(BlockCache {
+        let new_block = BlockCache {
             start_col,
             start_row,
             width: block_w,
             height: block_h,
             data: buffer.data().to_vec(),
-        });
+        };
+
+        let mut cache = self.cache.borrow_mut();
+        cache.insert(0, new_block);
+
+        if cache.len() > MAX_CACHE_ENTRIES {
+            cache.pop();
+        }
 
         Some(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn apply_nodata_check(&self, val: f32) -> Option<f32> {
         if let Some(no_data) = self.source.no_data_value {
             if (val - no_data as f32).abs() < 1e-6 {
@@ -220,5 +204,31 @@ impl ReaderSession {
             }
         }
         Some(val)
+    }
+}
+
+impl PixelSource for ReaderSession {
+    fn read_at(&self, col: isize, row: isize) -> Option<f32> {
+        let w = self.source.width as isize;
+        let h = self.source.height as isize;
+
+        if col < 0 || row < 0 || col >= w || row >= h {
+            return None;
+        }
+
+        if let Some(data) = &self.source.preloaded_data {
+            let idx = (row as usize) * self.source.width + (col as usize);
+            return self.apply_nodata_check(data[idx]);
+        }
+
+        self.read_from_disk(col, row, w, h)
+    }
+
+    fn width(&self) -> usize {
+        self.source.width
+    }
+
+    fn height(&self) -> usize {
+        self.source.height
     }
 }

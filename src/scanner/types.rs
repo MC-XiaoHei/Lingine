@@ -1,4 +1,5 @@
 use geo::Rect;
+use std::fmt;
 use std::path::PathBuf;
 
 pub struct DataCatalog {
@@ -25,7 +26,6 @@ pub struct EsaTile {
     pub bounds: Rect<f64>,
 
     pub path_map: PathBuf,
-    pub path_quality: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -52,8 +52,30 @@ pub enum CoverageResult {
     },
 }
 
-#[derive(Debug)]
-pub struct ValidationReport {
-    pub is_ready: bool,
-    pub details: Vec<String>,
+impl CoverageResult {
+    pub fn is_full(&self) -> bool {
+        matches!(self, Self::Full)
+    }
+}
+
+impl fmt::Display for CoverageResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Full => write!(f, "All datasets fully cover the ROI."),
+            Self::Partial {
+                alos_coverage,
+                esa_coverage,
+                soil_coverage,
+            } => {
+                writeln!(
+                    f,
+                    "Dataset insufficient, the current datasets does not cover the request ROI"
+                )?;
+                writeln!(f, "Coverages are:")?;
+                writeln!(f, "Alos Palsar: {:.2}%", alos_coverage * 100.0)?;
+                writeln!(f, "Esa WorldCover: {:.2}%", esa_coverage * 100.0)?;
+                write!(f, "Soil Grids: {:.2}%", soil_coverage * 100.0)
+            }
+        }
+    }
 }

@@ -32,7 +32,6 @@ async fn try_load_tile(path: PathBuf) -> Result<Option<EsaTile>> {
         id,
         bounds,
         path_map: map_file,
-        path_quality: quality_file,
     }))
 }
 

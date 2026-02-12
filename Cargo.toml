@@ -19,8 +19,3 @@ regex = "1.12"
 tap = "1.0"
 tokio = { version = "1.49", features = ["full"] }
 walkdir = "2.5"
-
-# for now. TODO
-[lints.rust]
-unused_imports = "allow"
-dead_code = "allow"
