@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use anyhow::Result;
 
 pub trait TryTap: Sized {

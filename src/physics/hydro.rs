@@ -1,6 +1,5 @@
 use crate::core::terrain::TerrainGrid;
 use crate::utils::float::FloatEx;
-use crate::utils::tap::{PipeEx, TapEx};
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -19,63 +18,78 @@ pub fn calc_flow_accumulation(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<f32>
 fn compute_downstream_map(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<Option<u32>> {
     let width = grid.width;
     let height = grid.height;
-    let total_pixels = width * height;
-    let update_frequency = width;
 
-    (0..total_pixels)
+    let rows: Vec<Option<u32>> = (0..height)
         .into_par_iter()
-        .map(|index| {
-            if index % update_frequency == 0 {
-                bar.inc(update_frequency as u64);
+        .map(|y| {
+            if y % 100 == 0 {
+                bar.inc(width as u64 * 100);
+            }
+            if y == 0 || y == height - 1 {
+                return vec![None; width];
             }
 
-            let current_elevation = grid.elevation[index].pipe_when(|v| v.is_nan(), |_| f32::NAN);
+            let mut row_result = Vec::with_capacity(width);
 
-            let x = index % width;
-            let y = index / width;
+            row_result.push(None);
 
-            if is_border(x, y, width, height) {
-                return None;
+            for x in 1..width - 1 {
+                let idx = y * width + x;
+                let current_z = grid.elevation[idx];
+
+                if current_z.is_nan() {
+                    row_result.push(None);
+                } else {
+                    row_result.push(find_lowest_neighbor_unrolled(grid, x, y, current_z));
+                }
             }
 
-            find_lowest_neighbor(grid, x, y, current_elevation)
+            row_result.push(None);
+
+            row_result
         })
-        .collect()
+        .flatten()
+        .collect();
+
+    rows
 }
 
-fn is_border(x: usize, y: usize, width: usize, height: usize) -> bool {
-    x == 0 || x == width - 1 || y == 0 || y == height - 1
-}
-
-fn find_lowest_neighbor(
+#[inline(always)]
+fn find_lowest_neighbor_unrolled(
     grid: &TerrainGrid,
     x: usize,
     y: usize,
-    current_elevation: f32,
+    current_z: f32,
 ) -> Option<u32> {
-    let width = grid.width;
-    let mut min_elevation = current_elevation;
-    let mut target_index = None;
+    let w = grid.width;
+    let idx = y * w + x;
 
-    for dy in -1..=1 {
-        for dx in -1..=1 {
-            if dx == 0 && dy == 0 {
-                continue;
-            }
+    #[rustfmt::skip]
+    let n_idxes = [
+        idx - w - 1, idx - w, idx - w + 1,
+        idx - 1,              idx + 1,
+        idx + w - 1, idx + w, idx + w + 1,
+    ];
 
-            let nx = (x as isize + dx) as usize;
-            let ny = (y as isize + dy) as usize;
-            let neighbor_index = ny * width + nx;
+    let mut min_z = current_z;
+    let mut min_idx = u32::MAX;
 
-            grid.elevation[neighbor_index].tap_when(f32::is_not_nan, |&neighbor_elevation| {
-                if neighbor_elevation < min_elevation {
-                    min_elevation = neighbor_elevation;
-                    target_index = Some(neighbor_index as u32);
-                }
-            });
+    for &ni in &n_idxes {
+        let nz = grid.elevation[ni];
+
+        let mask = nz < min_z;
+
+        if mask {
+            min_z = nz;
+            min_idx = ni as u32;
         }
     }
-    target_index
+
+    if min_idx == u32::MAX {
+        None
+    } else {
+        Some(min_idx)
+    }
 }
 
 fn compute_in_degree(downstream_map: &[Option<u32>], count: usize) -> Vec<AtomicU8> {
