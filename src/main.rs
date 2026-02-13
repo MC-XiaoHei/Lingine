@@ -2,20 +2,20 @@ mod alignment;
 mod core;
 mod loader;
 mod physics;
-mod restoration;
+mod post_process;
 mod scanner;
 mod utils;
 
 use crate::core::validator::{validate_data_catalog, validate_terrain_grid};
 use crate::scanner::scan_datasets;
 use crate::utils::tap::{TryPipe, TryTap};
-use alignment::align_and_resample;
+use alignment::layers_align_and_resample;
 use anyhow::Result;
 use core::context::SpatialContext;
 use geo::{Coord, Rect};
 use loader::load_layers;
 use physics::physics_analyze;
-use restoration::terrain_restoration;
+use post_process::terrain_post_process;
 use tap::Tap;
 
 #[tokio::main]
@@ -44,8 +44,8 @@ async fn run_pipeline() -> Result<()> {
         .await?
         .try_tap(|c| validate_data_catalog(c, roi))?
         .try_pipe(|c| load_layers(&c))?
-        .try_pipe(|assets| align_and_resample(&assets, &ctx))?
-        .try_tap_mut(terrain_restoration)?
+        .try_pipe(|assets| layers_align_and_resample(&assets, &ctx))?
+        .try_tap_mut(terrain_post_process)?
         .try_tap(validate_terrain_grid)?;
 
     let physics_map = physics_analyze(&terrain, &ctx)?;

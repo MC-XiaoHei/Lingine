@@ -1,15 +1,17 @@
 pub mod fill;
 pub mod median;
+mod fbm;
 
 use crate::core::terrain::TerrainGrid;
 use crate::utils::progress::create_progress_bar;
 use anyhow::Result;
 use fill::{fill_voids_continuous, fill_voids_discrete};
 use median::apply_median;
+use crate::post_process::fbm::apply_fbm;
 
 const UNIT_LEN: usize = 256;
 
-pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
+pub fn terrain_post_process(grid: &mut TerrainGrid) -> Result<()> {
     let h = grid.height;
     let w = grid.width;
 
@@ -20,10 +22,12 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     let count_median = get_median_layers(grid).len() as u64;
 
     let ticks_per_fill = calc_fill_ticks(w, h, ITERS_SMOOTH);
-    let total_rows =
-        (count_continuous + count_discrete) * ticks_per_fill + (count_median * h as u64);
+    let fill_steps = (count_continuous + count_discrete) * ticks_per_fill;
+    let median_steps = count_median * h as u64;
+    let fbm_steps = h as u64;
+    let total_steps = fill_steps + median_steps + fbm_steps;
 
-    let bar = create_progress_bar(total_rows, "Terrain Restoration");
+    let bar = create_progress_bar(total_steps, "Terrain Post-Process");
 
     let mut f32_aux_buffer = vec![f32::NAN; w * h];
 
@@ -42,6 +46,8 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     get_median_layers(grid).into_iter().for_each(|layer| {
         apply_median(layer, &mut f32_aux_buffer, w, h, &bar);
     });
+
+    apply_fbm(grid, &bar);
 
     bar.finish();
     Ok(())

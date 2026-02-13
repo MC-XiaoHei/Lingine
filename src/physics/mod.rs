@@ -24,17 +24,14 @@ pub fn physics_analyze(grid: &TerrainGrid, ctx: &SpatialContext) -> Result<Physi
     let multi_bar = MultiProgress::new();
     let total_pixels = (grid.width * grid.height) as u64;
 
-    let bar_geom = multi_bar.add(create_progress_bar(
-        total_pixels,
-        "Geometry Analysis (Slope/Aspect/TPI)",
-    ));
+    let bar_geom = multi_bar.add(create_progress_bar(total_pixels, "Geometry Analysis"));
 
     let bar_hydro = multi_bar.add(create_progress_bar(
         total_pixels * 2,
-        "Hydrology Simulation (Flow/Topology/TWI)",
+        "Hydrology Simulation",
     ));
 
-    let bar_clim = multi_bar.add(create_progress_bar(total_pixels, "Climate Modeling (HLI)"));
+    let bar_clim = multi_bar.add(create_progress_bar(total_pixels, "Climate Modeling"));
 
     let ((slope, aspect, tpi, hli), flow_acc) = rayon::join(
         || {
