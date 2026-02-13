@@ -8,7 +8,7 @@ mod utils;
 
 use crate::core::validator::{validate_data_catalog, validate_terrain_grid};
 use crate::scanner::scan_datasets;
-use crate::utils::tap::TryTap;
+use crate::utils::tap::{TryPipe, TryTap};
 use alignment::align_and_resample;
 use anyhow::Result;
 use core::context::SpatialContext;
@@ -16,7 +16,7 @@ use geo::{Coord, Rect};
 use loader::load_layers;
 use physics::physics_analyze;
 use restoration::terrain_restoration;
-use tap::{Pipe, Tap};
+use tap::Tap;
 
 #[tokio::main]
 async fn main() -> Result<()> {

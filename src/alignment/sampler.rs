@@ -1,6 +1,7 @@
 use crate::core::terrain::TerrainPixel;
 use crate::loader::bundle::LayerBundle;
 use crate::loader::mosaic::MosaicSession;
+use tap::Pipe;
 
 pub struct SamplingSession {
     elevation: MosaicSession,
@@ -44,14 +45,26 @@ impl SamplingSession {
 
     #[inline]
     pub fn sample(&mut self, lon: f64, lat: f64) -> TerrainPixel {
+        let to_f32 = |opt: Option<f32>| opt.unwrap_or(f32::NAN);
+
         TerrainPixel {
-            elevation: self.elevation.fetch_bicubic(lon, lat).ok().flatten(),
+            elevation: self
+                .elevation
+                .fetch_bicubic(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
 
-            hh: self.hh.fetch_bilinear(lon, lat).ok().flatten(),
-            hv: self.hv.fetch_bilinear(lon, lat).ok().flatten(),
+            hh: self.hh.fetch_bilinear(lon, lat).ok().flatten().pipe(to_f32),
+            hv: self.hv.fetch_bilinear(lon, lat).ok().flatten().pipe(to_f32),
 
-            inc: self.inc.fetch_bilinear(lon, lat).ok().flatten(),
-            ls: self.ls.fetch_bilinear(lon, lat).ok().flatten(),
+            inc: self
+                .inc
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
+            ls: self.ls.fetch_bilinear(lon, lat).ok().flatten().pipe(to_f32),
 
             landcover: self
                 .landcover
@@ -60,14 +73,44 @@ impl SamplingSession {
                 .flatten()
                 .map(|v| v as u8),
 
-            sand: self.sand.fetch_bilinear(lon, lat).ok().flatten(),
-            clay: self.clay.fetch_bilinear(lon, lat).ok().flatten(),
-            ph: self.ph.fetch_bilinear(lon, lat).ok().flatten(),
-            soc: self.soc.fetch_bilinear(lon, lat).ok().flatten(),
+            sand: self
+                .sand
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
+            clay: self
+                .clay
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
+            ph: self.ph.fetch_bilinear(lon, lat).ok().flatten().pipe(to_f32),
+            soc: self
+                .soc
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
 
-            sand_sub: self.sand_sub.fetch_bilinear(lon, lat).ok().flatten(),
-            clay_sub: self.clay_sub.fetch_bilinear(lon, lat).ok().flatten(),
-            ph_sub: self.ph_sub.fetch_bilinear(lon, lat).ok().flatten(),
+            sand_sub: self
+                .sand_sub
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
+            clay_sub: self
+                .clay_sub
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
+            ph_sub: self
+                .ph_sub
+                .fetch_bilinear(lon, lat)
+                .ok()
+                .flatten()
+                .pipe(to_f32),
         }
     }
 }

@@ -40,7 +40,7 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     Ok(())
 }
 
-fn get_continuous_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<f32>>> {
+fn get_continuous_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<f32>> {
     vec![
         &mut g.elevation,
         &mut g.hh,
@@ -61,7 +61,7 @@ fn get_discrete_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<u8>>> {
     vec![&mut g.landcover]
 }
 
-fn get_median_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<f32>>> {
+fn get_median_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<f32>> {
     vec![&mut g.sand, &mut g.clay, &mut g.soc, &mut g.ph]
 }
 

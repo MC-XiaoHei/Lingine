@@ -3,38 +3,38 @@ use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct TerrainPixel {
-    pub elevation: Option<f32>,
+    pub elevation: f32,
 
-    pub hh: Option<f32>,
-    pub hv: Option<f32>,
-    pub inc: Option<f32>,
-    pub ls: Option<f32>,
+    pub hh: f32,
+    pub hv: f32,
+    pub inc: f32,
+    pub ls: f32,
 
     pub landcover: Option<u8>,
 
-    pub sand: Option<f32>,
-    pub sand_sub: Option<f32>,
-    pub clay: Option<f32>,
-    pub clay_sub: Option<f32>,
-    pub ph: Option<f32>,
-    pub ph_sub: Option<f32>,
-    pub soc: Option<f32>,
+    pub sand: f32,
+    pub sand_sub: f32,
+    pub clay: f32,
+    pub clay_sub: f32,
+    pub ph: f32,
+    pub ph_sub: f32,
+    pub soc: f32,
 }
 
 pub struct RowViewMut<'a> {
-    elevation: &'a mut [Option<f32>],
-    hh: &'a mut [Option<f32>],
-    hv: &'a mut [Option<f32>],
-    inc: &'a mut [Option<f32>],
-    ls: &'a mut [Option<f32>],
+    elevation: &'a mut [f32],
+    hh: &'a mut [f32],
+    hv: &'a mut [f32],
+    inc: &'a mut [f32],
+    ls: &'a mut [f32],
     landcover: &'a mut [Option<u8>],
-    sand: &'a mut [Option<f32>],
-    sand_sub: &'a mut [Option<f32>],
-    clay: &'a mut [Option<f32>],
-    clay_sub: &'a mut [Option<f32>],
-    ph: &'a mut [Option<f32>],
-    ph_sub: &'a mut [Option<f32>],
-    soc: &'a mut [Option<f32>],
+    sand: &'a mut [f32],
+    sand_sub: &'a mut [f32],
+    clay: &'a mut [f32],
+    clay_sub: &'a mut [f32],
+    ph: &'a mut [f32],
+    ph_sub: &'a mut [f32],
+    soc: &'a mut [f32],
 }
 
 impl<'a> RowViewMut<'a> {
@@ -61,21 +61,21 @@ pub struct TerrainGrid {
     pub width: usize,
     pub height: usize,
 
-    pub elevation: Vec<Option<f32>>,
-    pub hh: Vec<Option<f32>>,
-    pub hv: Vec<Option<f32>>,
-    pub inc: Vec<Option<f32>>,
-    pub ls: Vec<Option<f32>>,
+    pub elevation: Vec<f32>,
+    pub hh: Vec<f32>,
+    pub hv: Vec<f32>,
+    pub inc: Vec<f32>,
+    pub ls: Vec<f32>,
 
     pub landcover: Vec<Option<u8>>,
 
-    pub sand: Vec<Option<f32>>,
-    pub sand_sub: Vec<Option<f32>>,
-    pub clay: Vec<Option<f32>>,
-    pub clay_sub: Vec<Option<f32>>,
-    pub ph: Vec<Option<f32>>,
-    pub ph_sub: Vec<Option<f32>>,
-    pub soc: Vec<Option<f32>>,
+    pub sand: Vec<f32>,
+    pub sand_sub: Vec<f32>,
+    pub clay: Vec<f32>,
+    pub clay_sub: Vec<f32>,
+    pub ph: Vec<f32>,
+    pub ph_sub: Vec<f32>,
+    pub soc: Vec<f32>,
 }
 
 impl TerrainGrid {
@@ -84,19 +84,19 @@ impl TerrainGrid {
         Self {
             width,
             height,
-            elevation: vec![None; len],
-            hh: vec![None; len],
-            hv: vec![None; len],
-            inc: vec![None; len],
-            ls: vec![None; len],
+            elevation: vec![f32::NAN; len],
+            hh: vec![f32::NAN; len],
+            hv: vec![f32::NAN; len],
+            inc: vec![f32::NAN; len],
+            ls: vec![f32::NAN; len],
             landcover: vec![None; len],
-            sand: vec![None; len],
-            sand_sub: vec![None; len],
-            clay: vec![None; len],
-            clay_sub: vec![None; len],
-            ph: vec![None; len],
-            ph_sub: vec![None; len],
-            soc: vec![None; len],
+            sand: vec![f32::NAN; len],
+            sand_sub: vec![f32::NAN; len],
+            clay: vec![f32::NAN; len],
+            clay_sub: vec![f32::NAN; len],
+            ph: vec![f32::NAN; len],
+            ph_sub: vec![f32::NAN; len],
+            soc: vec![f32::NAN; len],
         }
     }
 

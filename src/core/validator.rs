@@ -1,5 +1,6 @@
 use crate::core::terrain::TerrainGrid;
 use crate::scanner::types::DataCatalog;
+use crate::utils::float::FloatEx;
 use crate::utils::progress::create_progress_bar;
 use anyhow::{Result, anyhow};
 use geo::Rect;
@@ -42,32 +43,34 @@ pub fn validate_terrain_grid(terrain: &TerrainGrid) -> Result<()> {
     let chunk_size = 10_000.max(total / 100);
 
     for (name, data) in f32_layers {
-        verify_layer(name, data, total, chunk_size, &bar)?;
+        verify_layer(name, data, total, chunk_size, &bar, |v| v.is_not_nan())?;
     }
 
     for (name, data) in u8_layers {
-        verify_layer(name, data, total, chunk_size, &bar)?;
+        verify_layer(name, data, total, chunk_size, &bar, |v| v.is_some())?;
     }
 
     bar.finish();
     Ok(())
 }
 
-fn verify_layer<T>(
+fn verify_layer<T, F>(
     name: &str,
-    data: &[Option<T>],
+    data: &[T],
     total_expected: usize,
     chunk_size: usize,
     bar: &ProgressBar,
+    predicate: F,
 ) -> Result<()>
 where
     T: Sync + Send,
+    F: Fn(&T) -> bool + Sync + Send,
 {
     let valid_count: usize = data
         .par_chunks(chunk_size)
         .map(|chunk| {
             bar.inc(chunk.len() as u64);
-            chunk.iter().flatten().count()
+            chunk.iter().filter(|v| predicate(v)).count()
         })
         .sum();
 

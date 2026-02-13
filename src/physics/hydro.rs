@@ -1,4 +1,6 @@
 use crate::core::terrain::TerrainGrid;
+use crate::utils::float::FloatEx;
+use crate::utils::tap::{PipeEx, TapEx};
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -27,10 +29,7 @@ fn compute_downstream_map(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<Option<u
                 bar.inc(update_frequency as u64);
             }
 
-            let current_elevation = match grid.elevation[index] {
-                Some(v) => v,
-                None => return None,
-            };
+            let current_elevation = grid.elevation[index].pipe_when(|v| v.is_nan(), |_| f32::NAN);
 
             let x = index % width;
             let y = index / width;
@@ -68,12 +67,12 @@ fn find_lowest_neighbor(
             let ny = (y as isize + dy) as usize;
             let neighbor_index = ny * width + nx;
 
-            if let Some(neighbor_elevation) = grid.elevation[neighbor_index]
-                && neighbor_elevation < min_elevation
-            {
-                min_elevation = neighbor_elevation;
-                target_index = Some(neighbor_index as u32);
-            }
+            grid.elevation[neighbor_index].tap_when(f32::is_not_nan, |&neighbor_elevation| {
+                if neighbor_elevation < min_elevation {
+                    min_elevation = neighbor_elevation;
+                    target_index = Some(neighbor_index as u32);
+                }
+            });
         }
     }
     target_index
@@ -104,7 +103,7 @@ fn perform_topological_accumulation(
     let mut processing_stack = Vec::with_capacity(count / 10);
 
     for (index, item) in in_degree_map.iter().enumerate().take(count) {
-        if item.load(Ordering::Relaxed) == 0 && grid.elevation[index].is_some() {
+        if item.load(Ordering::Relaxed) == 0 && grid.elevation[index].is_not_nan() {
             processing_stack.push(index);
         }
     }

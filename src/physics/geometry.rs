@@ -1,4 +1,5 @@
 use crate::core::terrain::TerrainGrid;
+use crate::utils::tap::PipeEx;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::f64::consts::PI;
@@ -25,15 +26,15 @@ pub fn calc_geometry(grid: &TerrainGrid, bar: &ProgressBar) -> (Vec<f32>, Vec<f3
             for x in 1..w - 1 {
                 let idx = y * w + x;
 
-                if grid.elevation[idx].is_none() {
+                if grid.elevation[idx].is_nan() {
                     continue;
                 }
 
-                let center_z = grid.elevation[idx].unwrap();
+                let center_z = grid.elevation[idx];
                 let get = |dx: isize, dy: isize| -> f32 {
                     let nx = (x as isize + dx) as usize;
                     let ny = (y as isize + dy) as usize;
-                    grid.elevation[ny * w + nx].unwrap_or(center_z)
+                    grid.elevation[ny * w + nx].pipe_when(|v| v.is_nan(), |_| center_z)
                 };
 
                 let z1 = get(-1, -1);
