@@ -1,10 +1,10 @@
 use crate::core::terrain::TerrainGrid;
+use crate::scanner::types::DataCatalog;
 use crate::utils::progress::create_progress_bar;
 use anyhow::{Result, anyhow};
 use geo::Rect;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
-use crate::scanner::types::DataCatalog;
 
 pub fn validate_data_catalog(data_catalog: &DataCatalog, roi: Rect<f64>) -> Result<()> {
     let coverage = data_catalog.check_coverage(roi);

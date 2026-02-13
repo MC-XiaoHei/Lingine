@@ -11,10 +11,12 @@ use crate::scanner::scan_datasets;
 use crate::utils::tap::TryTap;
 use alignment::align_and_resample;
 use anyhow::Result;
+use core::context::SpatialContext;
 use geo::{Coord, Rect};
 use loader::load_layers;
 use physics::physics_analyze;
 use restoration::terrain_restoration;
+use tap::{Pipe, Tap};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,15 +38,17 @@ async fn run_pipeline() -> Result<()> {
         },
     );
 
+    let ctx = SpatialContext::analyze(roi).tap(|ctx| println!("{ctx}"));
+
     let terrain = scan_datasets()
         .await?
         .try_tap(|c| validate_data_catalog(c, roi))?
         .try_pipe(|c| load_layers(&c))?
-        .try_pipe(|assets| align_and_resample(&assets, roi))?
+        .try_pipe(|assets| align_and_resample(&assets, &ctx))?
         .try_tap_mut(terrain_restoration)?
         .try_tap(validate_terrain_grid)?;
 
-    let physics_map = physics_analyze(&terrain)?;
+    let physics_map = physics_analyze(&terrain, &ctx)?;
 
     let avg_slope: f32 = physics_map.slope.iter().sum::<f32>()
         / physics_map.slope.len() as f32

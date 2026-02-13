@@ -10,6 +10,6 @@ pub trait DatasetEx {
 impl DatasetEx for Dataset {
     fn open_dataset(path: impl AsRef<Path>) -> Result<Dataset> {
         let path = path.as_ref();
-        Dataset::open(&path).with_context(|| format!("Failed to open GeoTIFF: {path:?}"))
+        Dataset::open(path).with_context(|| format!("Failed to open GeoTIFF: {path:?}"))
     }
 }

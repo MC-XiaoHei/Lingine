@@ -1,10 +1,10 @@
 use super::geo_utils::extract_bounds_async;
 use crate::scanner::path_utils::normalize_path;
+use crate::scanner::types::SoilTile;
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use crate::scanner::types::SoilTile;
 
 pub async fn scan(root: PathBuf) -> Result<Vec<SoilTile>> {
     let p_sand_top = root.join("sand/0-5");
@@ -87,7 +87,7 @@ async fn align_layers(
     let mut bundles = Vec::new();
 
     for id in candidates {
-        let maybe_bundle = (async || {
+        let maybe_bundle = async {
             let p1 = sand_top.get(&id)?;
             let p2 = sand_sub.get(&id)?;
             let p3 = clay_top.get(&id)?;
@@ -109,7 +109,7 @@ async fn align_layers(
                 ph_top: p6.clone(),
                 ph_sub: p7.clone(),
             })
-        })()
+        }
         .await;
 
         if let Some(bundle) = maybe_bundle {

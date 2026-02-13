@@ -1,5 +1,6 @@
-use crate::alignment::projection::AdaptiveLtm;
+use crate::core::projection::AdaptiveLtm;
 use geo::{Coord, Rect};
+use std::fmt::Display;
 
 pub struct SpatialContext {
     pub ltm: AdaptiveLtm,
@@ -36,5 +37,19 @@ impl SpatialContext {
         let mx = self.roi_meters.min().x + x as f64 + 0.5;
         let my = self.roi_meters.min().y + y as f64 + 0.5;
         self.ltm.unproject(mx, my)
+    }
+}
+
+impl Display for SpatialContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Physical Dimensions: {:.2}m x {:.2}m",
+            self.roi_meters.width().abs(),
+            self.roi_meters.height().abs()
+        )?;
+        write!(f, "Grid Resolution: {} x {}", self.width, self.height)?;
+        write!(f, "Total Voxels: {}", self.total_pixels)?;
+        Ok(())
     }
 }

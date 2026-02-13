@@ -1,4 +1,3 @@
-use geo::Coord;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 
@@ -61,7 +60,6 @@ impl<'a> RowViewMut<'a> {
 pub struct TerrainGrid {
     pub width: usize,
     pub height: usize,
-    pub center: Coord<f64>,
 
     pub elevation: Vec<Option<f32>>,
     pub hh: Vec<Option<f32>>,
@@ -81,12 +79,11 @@ pub struct TerrainGrid {
 }
 
 impl TerrainGrid {
-    pub fn new(width: usize, height: usize, center: Coord<f64>) -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         let len = width * height;
         Self {
             width,
             height,
-            center,
             elevation: vec![None; len],
             hh: vec![None; len],
             hv: vec![None; len],

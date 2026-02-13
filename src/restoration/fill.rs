@@ -1,8 +1,8 @@
+use crate::restoration::UNIT_LEN;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::restoration::UNIT_LEN;
 
 pub fn fill_voids_continuous(
     data: &mut Vec<Option<f32>>,
@@ -12,11 +12,18 @@ pub fn fill_voids_continuous(
     bar: &ProgressBar,
 ) {
     if width < UNIT_LEN || height < UNIT_LEN {
-        fill_voids_core(data, width, height, UNIT_LEN as u64, bar, continuous_strategy);
+        fill_voids_core(
+            data,
+            width,
+            height,
+            UNIT_LEN as u64,
+            bar,
+            continuous_strategy,
+        );
         return;
     }
 
-    let (small_w, small_h) = ((width + 1) / 2, (height + 1) / 2);
+    let (small_w, small_h) = (width.div_ceil(2), height.div_ceil(2));
     let mut small_data = downsample_continuous(data, width, height, small_w, small_h, bar);
 
     fill_voids_continuous(&mut small_data, small_w, small_h, iters, bar);
@@ -43,11 +50,12 @@ fn downsample_continuous(
             let mut count = 0;
             for dy in 0..2 {
                 for dx in 0..2 {
-                    if sx + dx < src_w && sy + dy < src_h {
-                        if let Some(v) = src[(sy + dy) * src_w + (sx + dx)] {
-                            sum += v;
-                            count += 1;
-                        }
+                    if sx + dx < src_w
+                        && sy + dy < src_h
+                        && let Some(v) = src[(sy + dy) * src_w + (sx + dx)]
+                    {
+                        sum += v;
+                        count += 1;
                     }
                 }
             }
@@ -71,7 +79,9 @@ fn upsample_merge_continuous_bilinear(
 ) {
     target.par_chunks_mut(t_w).enumerate().for_each(|(y, row)| {
         for (x, pixel) in row.iter_mut().enumerate() {
-            if pixel.is_some() { continue; }
+            if pixel.is_some() {
+                continue;
+            }
 
             let src_x = (x as f32 + 0.5) / 2.0 - 0.5;
             let src_y = (y as f32 + 0.5) / 2.0 - 0.5;
@@ -124,7 +134,7 @@ pub fn fill_voids_discrete(
         fill_voids_core(data, width, height, UNIT_LEN as u64, bar, discrete_strategy);
         return;
     }
-    let (small_w, small_h) = ((width + 1) / 2, (height + 1) / 2);
+    let (small_w, small_h) = (width.div_ceil(2), height.div_ceil(2));
     let mut small_data = downsample_discrete(data, width, height, small_w, small_h, bar);
 
     fill_voids_discrete(&mut small_data, small_w, small_h, iters, bar);
@@ -148,10 +158,11 @@ fn downsample_discrete(
             let mut counts = HashMap::with_capacity(4);
             for dy in 0..2 {
                 for dx in 0..2 {
-                    if sx + dx < src_w && sy + dy < src_h {
-                        if let Some(v) = src[(sy + dy) * src_w + (sx + dx)] {
-                            *counts.entry(v).or_insert(0) += 1;
-                        }
+                    if sx + dx < src_w
+                        && sy + dy < src_h
+                        && let Some(v) = src[(sy + dy) * src_w + (sx + dx)]
+                    {
+                        *counts.entry(v).or_insert(0) += 1;
                     }
                 }
             }
@@ -172,7 +183,9 @@ fn upsample_merge_discrete(
 ) {
     target.par_chunks_mut(t_w).enumerate().for_each(|(y, row)| {
         for (x, pixel) in row.iter_mut().enumerate() {
-            if pixel.is_some() { continue; }
+            if pixel.is_some() {
+                continue;
+            }
             let sx = x / 2;
             let sy = y / 2;
             if let Some(val) = source.get(sy * s_w + sx).copied().flatten() {
@@ -185,8 +198,13 @@ fn upsample_merge_discrete(
 
 fn discrete_strategy(neighbors: &[u8]) -> Option<u8> {
     let mut counts = HashMap::with_capacity(neighbors.len());
-    for &val in neighbors { *counts.entry(val).or_insert(0) += 1; }
-    counts.into_iter().max_by_key(|&(_, count)| count).map(|(val, _)| val)
+    for &val in neighbors {
+        *counts.entry(val).or_insert(0) += 1;
+    }
+    counts
+        .into_iter()
+        .max_by_key(|&(_, count)| count)
+        .map(|(val, _)| val)
 }
 
 fn fill_voids_core<T, F>(
@@ -205,39 +223,43 @@ fn fill_voids_core<T, F>(
     for i in 0..max_iterations {
         let changed = AtomicBool::new(false);
 
-        aux.par_chunks_mut(width).enumerate().for_each(|(y, write_row)| {
-            let read_source = &data;
-            for (x, target_cell) in write_row.iter_mut().enumerate() {
-                let current_idx = y * width + x;
-                if let Some(v) = read_source[current_idx] {
-                    *target_cell = Some(v);
-                    continue;
-                }
-                let mut neighbors = Vec::with_capacity(8);
-                for dy in -1..=1 {
-                    for dx in -1..=1 {
-                        if dx == 0 && dy == 0 { continue; }
-                        let ny = y as isize + dy;
-                        let nx = x as isize + dx;
-                        if ny >= 0 && ny < height as isize && nx >= 0 && nx < width as isize {
-                            let idx = (ny as usize) * width + (nx as usize);
-                            if let Some(val) = read_source[idx] {
-                                neighbors.push(val);
+        aux.par_chunks_mut(width)
+            .enumerate()
+            .for_each(|(y, write_row)| {
+                let read_source = &data;
+                for (x, target_cell) in write_row.iter_mut().enumerate() {
+                    let current_idx = y * width + x;
+                    if let Some(v) = read_source[current_idx] {
+                        *target_cell = Some(v);
+                        continue;
+                    }
+                    let mut neighbors = Vec::with_capacity(8);
+                    for dy in -1..=1 {
+                        for dx in -1..=1 {
+                            if dx == 0 && dy == 0 {
+                                continue;
+                            }
+                            let ny = y as isize + dy;
+                            let nx = x as isize + dx;
+                            if ny >= 0 && ny < height as isize && nx >= 0 && nx < width as isize {
+                                let idx = (ny as usize) * width + (nx as usize);
+                                if let Some(val) = read_source[idx] {
+                                    neighbors.push(val);
+                                }
                             }
                         }
                     }
-                }
-                if !neighbors.is_empty() {
-                    if let Some(new_val) = strategy(&neighbors) {
+                    if !neighbors.is_empty()
+                        && let Some(new_val) = strategy(&neighbors)
+                    {
                         *target_cell = Some(new_val);
                         changed.store(true, Ordering::Relaxed);
                         continue;
                     }
+                    *target_cell = None;
                 }
-                *target_cell = None;
-            }
-            bar.inc(1);
-        });
+                bar.inc(1);
+            });
 
         std::mem::swap(data, &mut aux);
 

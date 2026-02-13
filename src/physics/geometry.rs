@@ -8,7 +8,9 @@ pub fn calc_geometry(grid: &TerrainGrid, bar: &ProgressBar) -> (Vec<f32>, Vec<f3
     let h = grid.height;
     let len = w * h;
 
-    let rows: Vec<(usize, Vec<f32>, Vec<f32>, Vec<f32>)> = (0..h)
+    type GeometryDataRow = (usize, Vec<f32>, Vec<f32>, Vec<f32>);
+
+    let rows: Vec<GeometryDataRow> = (0..h)
         .into_par_iter()
         .map(|y| {
             let mut row_slope = vec![0.0; w];

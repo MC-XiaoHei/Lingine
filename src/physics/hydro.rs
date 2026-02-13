@@ -20,32 +20,40 @@ fn compute_downstream_map(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<Option<u
     let total_pixels = width * height;
     let update_frequency = width;
 
-    (0..total_pixels).into_par_iter().map(|index| {
-        if index % update_frequency == 0 {
-            bar.inc(update_frequency as u64);
-        }
+    (0..total_pixels)
+        .into_par_iter()
+        .map(|index| {
+            if index % update_frequency == 0 {
+                bar.inc(update_frequency as u64);
+            }
 
-        let current_elevation = match grid.elevation[index] {
-            Some(v) => v,
-            None => return None,
-        };
+            let current_elevation = match grid.elevation[index] {
+                Some(v) => v,
+                None => return None,
+            };
 
-        let x = index % width;
-        let y = index / width;
+            let x = index % width;
+            let y = index / width;
 
-        if is_border(x, y, width, height) {
-            return None;
-        }
+            if is_border(x, y, width, height) {
+                return None;
+            }
 
-        find_lowest_neighbor(grid, x, y, current_elevation)
-    }).collect()
+            find_lowest_neighbor(grid, x, y, current_elevation)
+        })
+        .collect()
 }
 
 fn is_border(x: usize, y: usize, width: usize, height: usize) -> bool {
     x == 0 || x == width - 1 || y == 0 || y == height - 1
 }
 
-fn find_lowest_neighbor(grid: &TerrainGrid, x: usize, y: usize, current_elevation: f32) -> Option<u32> {
+fn find_lowest_neighbor(
+    grid: &TerrainGrid,
+    x: usize,
+    y: usize,
+    current_elevation: f32,
+) -> Option<u32> {
     let width = grid.width;
     let mut min_elevation = current_elevation;
     let mut target_index = None;
@@ -60,11 +68,11 @@ fn find_lowest_neighbor(grid: &TerrainGrid, x: usize, y: usize, current_elevatio
             let ny = (y as isize + dy) as usize;
             let neighbor_index = ny * width + nx;
 
-            if let Some(neighbor_elevation) = grid.elevation[neighbor_index] {
-                if neighbor_elevation < min_elevation {
-                    min_elevation = neighbor_elevation;
-                    target_index = Some(neighbor_index as u32);
-                }
+            if let Some(neighbor_elevation) = grid.elevation[neighbor_index]
+                && neighbor_elevation < min_elevation
+            {
+                min_elevation = neighbor_elevation;
+                target_index = Some(neighbor_index as u32);
             }
         }
     }
@@ -72,7 +80,8 @@ fn find_lowest_neighbor(grid: &TerrainGrid, x: usize, y: usize, current_elevatio
 }
 
 fn compute_in_degree(downstream_map: &[Option<u32>], count: usize) -> Vec<AtomicU8> {
-    let degrees: Vec<AtomicU8> = (0..count).into_par_iter()
+    let degrees: Vec<AtomicU8> = (0..count)
+        .into_par_iter()
         .map(|_| AtomicU8::new(0))
         .collect();
 
@@ -89,13 +98,13 @@ fn perform_topological_accumulation(
     downstream_map: &[Option<u32>],
     in_degree_map: Vec<AtomicU8>,
     grid: &TerrainGrid,
-    count: usize
+    count: usize,
 ) -> Vec<f32> {
     let mut accumulation = vec![1.0; count];
     let mut processing_stack = Vec::with_capacity(count / 10);
 
-    for index in 0..count {
-        if in_degree_map[index].load(Ordering::Relaxed) == 0 && grid.elevation[index].is_some() {
+    for (index, item) in in_degree_map.iter().enumerate().take(count) {
+        if item.load(Ordering::Relaxed) == 0 && grid.elevation[index].is_some() {
             processing_stack.push(index);
         }
     }

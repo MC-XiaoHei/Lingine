@@ -45,7 +45,7 @@ fn reproject_points(
         .context("GDAL Reprojection failed")?;
 
     Ok(x.into_iter()
-        .zip(y.into_iter())
+        .zip(y)
         .map(|(rx, ry)| Coord { x: rx, y: ry })
         .collect())
 }

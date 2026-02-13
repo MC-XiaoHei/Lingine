@@ -38,4 +38,11 @@ impl AdaptiveLtm {
             y: self.center_lat + d_lat,
         }
     }
+
+    pub fn convergence_angle(&self, lon: f64, lat: f64) -> f64 {
+        let d_lon = (lon - self.center_lon).to_radians();
+        let phi = lat.to_radians();
+
+        d_lon * phi.sin()
+    }
 }

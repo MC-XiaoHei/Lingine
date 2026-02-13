@@ -198,10 +198,10 @@ impl ReaderSession {
 
     #[inline(always)]
     fn apply_nodata_check(&self, val: f32) -> Option<f32> {
-        if let Some(no_data) = self.source.no_data_value {
-            if (val - no_data as f32).abs() < 1e-6 {
-                return None;
-            }
+        if let Some(no_data) = self.source.no_data_value
+            && (val - no_data as f32).abs() < 1e-6
+        {
+            return None;
         }
         Some(val)
     }

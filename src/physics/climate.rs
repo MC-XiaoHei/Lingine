@@ -1,11 +1,25 @@
+use crate::core::context::SpatialContext;
 use crate::core::terrain::TerrainGrid;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 
-pub fn calc_hli(grid: &TerrainGrid, slope: &[f32], aspect: &[f32], bar: &ProgressBar) -> Vec<f32> {
+pub fn calc_hli(
+    grid: &TerrainGrid,
+    slope: &[f32],
+    aspect: &[f32],
+    bar: &ProgressBar,
+    ctx: &SpatialContext,
+) -> Vec<f32> {
     let w = grid.width;
 
-    let hli: Vec<f32> = slope
+    let sun_azimuth = 225.0_f64.to_radians();
+    let sun_elev = 45.0_f64.to_radians();
+
+    let sx = sun_elev.cos() * sun_azimuth.sin();
+    let sy = sun_elev.cos() * sun_azimuth.cos();
+    let sz = sun_elev.sin();
+
+    slope
         .par_iter()
         .zip(aspect.par_iter())
         .enumerate()
@@ -18,24 +32,19 @@ pub fn calc_hli(grid: &TerrainGrid, slope: &[f32], aspect: &[f32], bar: &Progres
                 return 0.5;
             }
 
-            // Sun Vector: Azimuth = 225 deg (SW), Elevation = 45 deg
-            let sun_azimuth = 225.0_f64.to_radians();
-            let sun_elev = 45.0_f64.to_radians();
+            let x = i % w;
+            let y = i / w;
+            let geo = ctx.get_geo_coord(x, y);
+            let gamma = ctx.ltm.convergence_angle(geo.x, geo.y) as f32;
 
-            let sx = sun_elev.cos() * sun_azimuth.sin();
-            let sy = sun_elev.cos() * sun_azimuth.cos();
-            let sz = sun_elev.sin();
+            let corrected_aspect = a - gamma;
 
-            let nx = (s as f64).sin() * (a as f64).sin();
-            let ny = (s as f64).sin() * (a as f64).cos();
+            let nx = (s as f64).sin() * (corrected_aspect as f64).sin();
+            let ny = (s as f64).sin() * (corrected_aspect as f64).cos();
             let nz = (s as f64).cos();
 
             let dot = sx * nx + sy * ny + sz * nz;
-
-            let val = dot.max(0.0);
-            val as f32
+            dot.max(0.0) as f32
         })
-        .collect();
-
-    hli
+        .collect()
 }

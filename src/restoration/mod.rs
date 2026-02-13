@@ -19,7 +19,8 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     let count_median = get_median_layers(grid).len() as u64;
 
     let ticks_per_fill = calc_fill_ticks(w, h, ITERS_SMOOTH);
-    let total_rows = (count_continuous + count_discrete) * ticks_per_fill + (count_median * h as u64);
+    let total_rows =
+        (count_continuous + count_discrete) * ticks_per_fill + (count_median * h as u64);
 
     let bar = create_progress_bar(total_rows, "Terrain Restoration");
 
@@ -41,9 +42,18 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
 
 fn get_continuous_layers(g: &mut TerrainGrid) -> Vec<&mut Vec<Option<f32>>> {
     vec![
-        &mut g.elevation, &mut g.hh, &mut g.hv, &mut g.inc, &mut g.ls,
-        &mut g.sand, &mut g.clay, &mut g.soc, &mut g.ph,
-        &mut g.sand_sub, &mut g.clay_sub, &mut g.ph_sub,
+        &mut g.elevation,
+        &mut g.hh,
+        &mut g.hv,
+        &mut g.inc,
+        &mut g.ls,
+        &mut g.sand,
+        &mut g.clay,
+        &mut g.soc,
+        &mut g.ph,
+        &mut g.sand_sub,
+        &mut g.clay_sub,
+        &mut g.ph_sub,
     ]
 }
 
@@ -60,8 +70,8 @@ fn calc_fill_ticks(w: usize, h: usize, iters: u64) -> u64 {
         return (h as u64) * (UNIT_LEN as u64);
     }
 
-    let next_w = (w + 1) / 2;
-    let next_h = (h + 1) / 2;
+    let next_w = w.div_ceil(2);
+    let next_h = h.div_ceil(2);
 
     let mut ticks = 0;
 
