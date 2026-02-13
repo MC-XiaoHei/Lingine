@@ -3,8 +3,15 @@ use crate::utils::tap::TapEx;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 
-pub fn apply_median(data: &mut [f32], width: usize, height: usize, bar: &ProgressBar) {
-    let source = data.to_owned();
+pub fn apply_median(
+    data: &mut [f32],
+    aux: &mut [f32],
+    width: usize,
+    height: usize,
+    bar: &ProgressBar,
+) {
+    aux.copy_from_slice(data);
+    let source = &*aux;
 
     data.par_chunks_mut(width)
         .enumerate()

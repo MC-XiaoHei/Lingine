@@ -12,6 +12,7 @@ const UNIT_LEN: usize = 256;
 pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
     let h = grid.height;
     let w = grid.width;
+
     const ITERS_SMOOTH: u64 = 5;
 
     let count_continuous = get_continuous_layers(grid).len() as u64;
@@ -24,16 +25,22 @@ pub fn terrain_restoration(grid: &mut TerrainGrid) -> Result<()> {
 
     let bar = create_progress_bar(total_rows, "Terrain Restoration");
 
+    let mut f32_aux_buffer = vec![f32::NAN; w * h];
+
     get_continuous_layers(grid).into_iter().for_each(|layer| {
-        fill_voids_continuous(layer, w, h, ITERS_SMOOTH, &bar);
+        fill_voids_continuous(layer, &mut f32_aux_buffer, w, h, ITERS_SMOOTH, &bar);
     });
+
+    let mut u8_aux_buffer = vec![Some(0u8); w * h];
 
     get_discrete_layers(grid).into_iter().for_each(|layer| {
-        fill_voids_discrete(layer, w, h, ITERS_SMOOTH, &bar);
+        fill_voids_discrete(layer, &mut u8_aux_buffer, w, h, ITERS_SMOOTH, &bar);
     });
 
+    drop(u8_aux_buffer);
+
     get_median_layers(grid).into_iter().for_each(|layer| {
-        apply_median(layer, w, h, &bar);
+        apply_median(layer, &mut f32_aux_buffer, w, h, &bar);
     });
 
     bar.finish();
