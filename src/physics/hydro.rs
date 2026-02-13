@@ -10,9 +10,9 @@ pub fn calc_flow_accumulation(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<f32>
     let total_pixels = width * height;
 
     let downstream_map = compute_downstream_map(grid, bar);
-    let in_degree_map = compute_in_degree(&downstream_map, total_pixels);
+    let in_degree_map = compute_in_degree(&downstream_map, total_pixels, bar);
 
-    perform_topological_accumulation(&downstream_map, in_degree_map, grid, total_pixels)
+    perform_topological_accumulation(&downstream_map, in_degree_map, grid, total_pixels, bar)
 }
 
 fn compute_downstream_map(grid: &TerrainGrid, bar: &ProgressBar) -> Vec<Option<u32>> {
@@ -92,16 +92,23 @@ fn find_lowest_neighbor_unrolled(
     }
 }
 
-fn compute_in_degree(downstream_map: &[Option<u32>], count: usize) -> Vec<AtomicU8> {
+fn compute_in_degree(
+    downstream_map: &[Option<u32>],
+    count: usize,
+    bar: &ProgressBar,
+) -> Vec<AtomicU8> {
     let degrees: Vec<AtomicU8> = (0..count)
         .into_par_iter()
         .map(|_| AtomicU8::new(0))
         .collect();
 
-    downstream_map.par_iter().for_each(|target_opt| {
-        if let Some(target) = target_opt {
+    const CHUNK_SIZE: usize = 10_000;
+
+    downstream_map.par_chunks(CHUNK_SIZE).for_each(|chunk| {
+        for target in chunk.iter().flatten() {
             degrees[*target as usize].fetch_add(1, Ordering::Relaxed);
         }
+        bar.inc(chunk.len() as u64);
     });
 
     degrees
@@ -112,6 +119,7 @@ fn perform_topological_accumulation(
     in_degree_map: Vec<AtomicU8>,
     grid: &TerrainGrid,
     count: usize,
+    bar: &ProgressBar,
 ) -> Vec<f32> {
     let mut accumulation = vec![1.0; count];
     let mut processing_stack = Vec::with_capacity(count / 10);
@@ -122,7 +130,15 @@ fn perform_topological_accumulation(
         }
     }
 
+    let mut processed_count = 0;
+    const UPDATE_BATCH: usize = 10_000;
+
     while let Some(current_index) = processing_stack.pop() {
+        processed_count += 1;
+        if processed_count % UPDATE_BATCH == 0 {
+            bar.inc(UPDATE_BATCH as u64);
+        }
+
         if let Some(target) = downstream_map[current_index] {
             let target_index = target as usize;
             accumulation[target_index] += accumulation[current_index];
@@ -131,6 +147,10 @@ fn perform_topological_accumulation(
                 processing_stack.push(target_index);
             }
         }
+    }
+
+    if processed_count % UPDATE_BATCH != 0 {
+        bar.inc((processed_count % UPDATE_BATCH) as u64);
     }
 
     accumulation

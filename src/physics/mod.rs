@@ -27,7 +27,7 @@ pub fn physics_analyze(grid: &TerrainGrid, ctx: &SpatialContext) -> Result<Physi
     let bar_geom = multi_bar.add(create_progress_bar(total_pixels, "Geometry Analysis"));
 
     let bar_hydro = multi_bar.add(create_progress_bar(
-        total_pixels * 2,
+        total_pixels * 4,
         "Hydrology Simulation",
     ));
 
