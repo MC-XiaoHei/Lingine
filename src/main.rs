@@ -1,5 +1,6 @@
 mod alignment;
 mod core;
+mod exporter;
 mod loader;
 mod physics;
 mod post_process;
@@ -7,6 +8,7 @@ mod scanner;
 mod utils;
 
 use crate::core::validator::{validate_data_catalog, validate_terrain_grid};
+use crate::exporter::generate_world;
 use crate::scanner::scan_datasets;
 use crate::utils::tap::{TryPipe, TryTap};
 use alignment::layers_align_and_resample;
@@ -16,6 +18,7 @@ use geo::{Coord, Rect};
 use loader::load_layers;
 use physics::physics_analyze;
 use post_process::terrain_post_process;
+use std::path::Path;
 use tap::Tap;
 
 #[tokio::main]
@@ -54,6 +57,9 @@ async fn run_pipeline() -> Result<()> {
         / physics_map.slope.len() as f32
         / std::f32::consts::PI;
     println!("Average Slope: {:.4}π rad", avg_slope);
+
+    let output_root = Path::new("output");
+    generate_world(output_root, &terrain)?;
 
     Ok(())
 }

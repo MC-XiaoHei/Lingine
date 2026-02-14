@@ -18,6 +18,14 @@ pub fn validate_data_catalog(data_catalog: &DataCatalog, roi: Rect<f64>) -> Resu
 }
 
 pub fn validate_terrain_grid(terrain: &TerrainGrid) -> Result<()> {
+    const MAX_WORLD_HEIGHT: usize = 4064;
+    let world_height = terrain.max_elevation - terrain.min_elevation;
+    if world_height > MAX_WORLD_HEIGHT as f32 {
+        return Err(anyhow!(
+            "World height is too large ({world_height}m) to put into Minecraft worlds, please use another ROI"
+        ));
+    }
+
     let f32_layers = [
         ("Elevation", &terrain.elevation),
         ("HH", &terrain.hh),

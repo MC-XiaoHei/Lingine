@@ -1,13 +1,15 @@
+mod elevation;
+mod fbm;
 pub mod fill;
 pub mod median;
-mod fbm;
 
 use crate::core::terrain::TerrainGrid;
+use crate::post_process::elevation::compute_elevation;
+use crate::post_process::fbm::apply_fbm;
 use crate::utils::progress::create_progress_bar;
 use anyhow::Result;
 use fill::{fill_voids_continuous, fill_voids_discrete};
 use median::apply_median;
-use crate::post_process::fbm::apply_fbm;
 
 const UNIT_LEN: usize = 256;
 
@@ -25,7 +27,8 @@ pub fn terrain_post_process(grid: &mut TerrainGrid) -> Result<()> {
     let fill_steps = (count_continuous + count_discrete) * ticks_per_fill;
     let median_steps = count_median * h as u64;
     let fbm_steps = h as u64;
-    let total_steps = fill_steps + median_steps + fbm_steps;
+    let get_elevation_steps = h as u64;
+    let total_steps = fill_steps + median_steps + fbm_steps + get_elevation_steps;
 
     let bar = create_progress_bar(total_steps, "Terrain Post-Process");
 
@@ -48,6 +51,8 @@ pub fn terrain_post_process(grid: &mut TerrainGrid) -> Result<()> {
     });
 
     apply_fbm(grid, &bar);
+
+    compute_elevation(grid, &bar);
 
     bar.finish();
     Ok(())

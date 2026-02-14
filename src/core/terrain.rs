@@ -61,6 +61,9 @@ pub struct TerrainGrid {
     pub width: usize,
     pub height: usize,
 
+    pub min_elevation: f32,
+    pub max_elevation: f32,
+
     pub elevation: Vec<f32>,
     pub hh: Vec<f32>,
     pub hv: Vec<f32>,
@@ -84,6 +87,8 @@ impl TerrainGrid {
         Self {
             width,
             height,
+            min_elevation: f32::MAX,
+            max_elevation: f32::MIN,
             elevation: vec![f32::NAN; len],
             hh: vec![f32::NAN; len],
             hv: vec![f32::NAN; len],
